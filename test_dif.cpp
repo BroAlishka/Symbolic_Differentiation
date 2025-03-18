@@ -14,7 +14,7 @@ TEST_F(ExpressionTest, ConstructorAndToStringAndDiff) {
 TEST_F(ExpressionTest, ConstructorAndToStringAdDiff) {
     Expression<double> expr1 = (make_variable<double>("x") ^ make_variable<double>("y") );
     Expression<double> derivative1 = expr1.diff("x");
-    EXPECT_EQ(derivative1.to_string(), "(1.000000 / x)");
+    EXPECT_EQ(derivative1.to_string(), "((x ^ y) * ((0.000000 * ln(x)) + (y * (1.000000 / x))))");
 }
 
 
