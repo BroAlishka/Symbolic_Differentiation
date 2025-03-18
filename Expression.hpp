@@ -1,103 +1,142 @@
 #ifndef EXPRESSION_HPP
 #define EXPRESSION_HPP
 
-#include <memory>
+#include <variant>
 #include <string>
-#include <unordered_map>
-#include <stdexcept>
+#include <map>
+#include <memory>
+#include <cmath>
+#include <iostream>
+#include <complex>
+#include <vector>
+#include <stack>
 
-template<typename T>
+template <typename T>
 class Expression {
 public:
+    // Типы выражений
+    struct Number {
+        T value;
+    };
+
+    struct Variable {
+        std::string name;
+    };
+
+    struct OperationAdd {
+        std::shared_ptr<Expression<T>> left;
+        std::shared_ptr<Expression<T>> right;
+    };
+
+    struct OperationSub {
+        std::shared_ptr<Expression<T>> left;
+        std::shared_ptr<Expression<T>> right;
+    };
+
+    struct OperationMul {
+        std::shared_ptr<Expression<T>> left;
+        std::shared_ptr<Expression<T>> right;
+    };
+
+    struct OperationDiv {
+        std::shared_ptr<Expression<T>> left;
+        std::shared_ptr<Expression<T>> right;
+    };
+
+    struct OperationPow {
+        std::shared_ptr<Expression<T>> left;
+        std::shared_ptr<Expression<T>> right;
+    };
+
+    struct OperationSin {
+        std::shared_ptr<Expression<T>> arg;
+    };
+
+    struct OperationCos {
+        std::shared_ptr<Expression<T>> arg;
+    };
+
+    struct OperationLn {
+        std::shared_ptr<Expression<T>> arg;
+    };
+
+    struct OperationExp {
+        std::shared_ptr<Expression<T>> arg;
+    };
+
+    // Тип, который может хранить любое выражение
+    using ExprVariant = std::variant<
+        Number, Variable,
+        OperationAdd, OperationSub, OperationMul, OperationDiv, OperationPow,
+        OperationSin, OperationCos, OperationLn, OperationExp
+    >;
+
     // Конструкторы
-    Expression(T value); // Конструктор для числа
-    Expression(const std::string& variable); // Конструктор для переменной
-    Expression(std::unique_ptr<typename Expression<T>::Node> root); // Конструктор для узла
+    Expression(T value) : expr_(Number{value}) {}
+    Expression(std::string name) : expr_(Variable{name}) {}
+    Expression(ExprVariant expr) : expr_(expr) {}
 
     // Конструктор копирования
-    Expression(const Expression& other);
+    Expression(const Expression& other) : expr_(other.expr_) {}
 
-    // Конструктор перемещения
-    Expression(Expression&& other) noexcept;
+    Expression(Expression&& other) noexcept : expr_(std::move(other.expr_)) {}
 
-    // Деструктор
+    Expression& operator=(const Expression& other) {
+        if (this != &other) {
+            expr_ = other.expr_;
+        }
+        return *this;
+    }
+
+    Expression& operator=(Expression&& other) noexcept {
+        if (this != &other) {
+            expr_ = std::move(other.expr_);
+        }
+        return *this;
+    }
+
     ~Expression() = default;
 
-    // Оператор копирования
-    Expression& operator=(const Expression& other);
+    // Вычисление выражения
+    T eval(std::map<std::string, T> context) const;
 
-    // Оператор перемещения
-    Expression& operator=(Expression&& other) noexcept;
+    // Преобразование в строку
+    std::string to_string() const;
 
-    // Операция сложения
+    // Перегрузки операторов
     Expression operator+(const Expression& other) const;
+    Expression operator-(const Expression& other) const;
+    Expression operator*(const Expression& other) const;
+    Expression operator/(const Expression& other) const;
+    Expression operator^(const Expression& other) const;
 
-    // Преобразование выражения в строку
-    std::string toString() const;
+    // Функции
+    Expression sin() const;
+    Expression cos() const;
+    Expression ln() const;
+    Expression exp() const;
 
-    // Операция подстановки значения переменной
-    T evaluate(const std::string& variable, T value) const;
+    // Подстановка значения переменной
+    Expression substitute(const std::string& varName, const T& value) const;
 
-    // Операция вычисления выражения при заданных значениях переменных
-    T evaluate(const std::unordered_map<std::string, T>& variables) const;
+    // Создание выражения из строки
+
+    // Дифференцирование по переменной
+    Expression diff(const std::string& varName) const;
 
 private:
-    // Базовый класс для узлов выражения
-    struct Node {
-        virtual ~Node() = default;
-        virtual T evaluate(const std::unordered_map<std::string, T>& variables) const = 0;
-        virtual std::string toString() const = 0;
-        virtual std::unique_ptr<Node> clone() const = 0;
-    };
-
-    // Узел для числа
-    struct NumberNode : Node {
-        T value;
-        NumberNode(T value) : value(value) {}
-        T evaluate(const std::unordered_map<std::string, T>& variables) const override { return value; }
-        std::string toString() const override { return std::to_string(value); }
-        std::unique_ptr<Node> clone() const override { return std::make_unique<NumberNode>(value); }
-
-    };
-
-    // Узел для переменной
-    struct VariableNode : Node {
-        std::string variable;
-        VariableNode(const std::string& variable) : variable(variable) {}
-        T evaluate(const std::unordered_map<std::string, T>& variables) const override {
-            auto it = variables.find(variable);
-            if (it != variables.end()) return it->second;
-            throw std::runtime_error("Variable not found: " + variable);
-        }
-        std::string toString() const override { return variable; }
-        std::unique_ptr<Node> clone() const override { return std::make_unique<VariableNode>(variable); }
-
-    };
-
-    // Узел для операции сложения
-    struct AdditionNode : Node {
-        std::unique_ptr<Node> left, right;
-        AdditionNode(std::unique_ptr<Node> left, std::unique_ptr<Node> right)
-            : left(std::move(left)), right(std::move(right)) {}
-        T evaluate(const std::unordered_map<std::string, T>& variables) const override {
-            return left->evaluate(variables) + right->evaluate(variables);
-        }
-        std::string toString() const override {
-            return "(" + left->toString() + " + " + right->toString() + ")";
-        }
-        std::unique_ptr<Node> clone() const override {
-            return std::make_unique<AdditionNode>(left->clone(), right->clone());
-        }
-
-    };
-
-    std::unique_ptr<Node> root; // Корень дерева выражения
-
-    // Вспомогательная функция для клонирования дерева
-    std::unique_ptr<Node> cloneTree(const std::unique_ptr<Node>& node) const {
-        if (node) return node->clone();
-        return nullptr;
-    }
+    ExprVariant expr_;
 };
+
+// Функции для создания выражений
+template <typename T>
+Expression<T> make_value(T value) {
+    return Expression<T>(value);
+}
+
+template <typename T>
+Expression<T> make_variable(std::string name) {
+    return Expression<T>(name);
+}
 
 #endif // EXPRESSION_HPP
